@@ -11,8 +11,7 @@ local this = {}
 ---@class Config
 this.defaultConfig = {
     enable = true,
-    fallbackGlobal = true,
-    perCharacter = false,
+    useCharacterProfile = true,
     ---@type PortraitProfile
     global = {
         enable = true,
@@ -28,7 +27,6 @@ this.configPath = "longod.CustomPortrait"
 ---@return Config
 function this.Load()
     this.config = this.config or mwse.loadConfig(this.configPath, this.defaultConfig)
-    mwse.log(this.config)
     return this.config
 end
 
@@ -41,6 +39,7 @@ end
 function this.GetCharacterProfile(self)
     if not tes3.onMainMenu() and tes3.player and tes3.player.data then
         if tes3.player.data.customPortrait == nil then
+            -- todo no allocate in this time
             tes3.player.data.customPortrait = table.deepcopy(self.Load().global)
         end
         return tes3.player.data.customPortrait
@@ -54,12 +53,10 @@ function this.GetProfile(self)
     local config = self.Load()
     if config.enable then
         -- fixme
-        if config.perCharacter and not tes3.onMainMenu() and tes3.player and tes3.player.data then
+        if config.useCharacterProfile and not tes3.onMainMenu() and tes3.player and tes3.player.data then
             return self:GetCharacterProfile()
         end
-        if config.fallbackGlobal then
-            return config.global
-        end
+        return config.global
     end
     return nil
 end

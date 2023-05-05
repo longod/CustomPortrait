@@ -6,6 +6,42 @@ local showPortrait = true
 local textureWidth = 1
 local textureHeight = 1
 
+---@param width integer
+---@param n tes3uiElement
+---@return integer
+local function AddBorderWidth(width, n)
+    if n.parent then
+        if n.borderRight then
+            width = width + n.borderRight
+        elseif n.borderAllSides then
+            width = width + n.borderAllSides
+        end
+        if n.borderLeft then
+            width = width + n.borderLeft
+        elseif n.borderAllSides then
+            width = width + n.borderAllSides
+        end
+    end
+    return width
+end
+
+---@param width integer
+---@param n tes3uiElement
+---@return integer
+local function AddPaddingWidth(width, n)
+    if n.paddingRight then
+        width = width + n.paddingRight
+    elseif n.paddingAllSides then
+        width = width + n.paddingAllSides
+    end
+    if n.paddingLeft then
+        width = width + n.paddingLeft
+    elseif n.paddingAllSides then
+        width = width + n.paddingAllSides
+    end
+    return width
+end
+
 ---comment
 ---@param e tes3uiEventData
 ---@param image tes3uiElement
@@ -21,13 +57,15 @@ local function OnPreUpdate(e, image, sourceAspectRatio)
 
         if image.contentPath ~= path then
             if not validater.IsValidPath(path) then
-                tes3.messageBox("Error1") -- todo once
+                tes3.messageBox("[Custom Portrait] Invalid Path: " .. profile.path)
+                showPortrait = false
                 return
             end
     
             local texture = niSourceTexture.createFromPath(path)
             if not validater.IsValidTextue(texture) then
-                tes3.messageBox("Error2") -- todo once
+                tes3.messageBox("[Custom Portrait] Invalid Texture: " .. profile.path)
+                showPortrait = false
                 return
             end
     
@@ -114,41 +152,13 @@ local function OnUiActivated(e)
 
                 local windowMinWidth = math.max(image.minWidth, image.width)
                 local node = image
-                if node.borderRight or node.borderLeft then
-                    if node.borderRight then
-                        windowMinWidth = windowMinWidth + node.borderRight
-                    end
-                    if node.borderLeft then
-                        windowMinWidth = windowMinWidth + node.borderLeft
-                    end
-                elseif node.borderAllSides then
-                    windowMinWidth = windowMinWidth + node.borderAllSides * 2
-                end
+                -- exclude padding
+                windowMinWidth = AddBorderWidth(windowMinWidth, node)
                 
                 node = node.parent
                 while node ~= nil do
-                    if node.parent then
-                        if node.borderRight or node.borderLeft then
-                            if node.borderRight then
-                                windowMinWidth = windowMinWidth + node.borderRight
-                            end
-                            if node.borderLeft then
-                                windowMinWidth = windowMinWidth + node.borderLeft
-                            end
-                        elseif node.borderAllSides then
-                            windowMinWidth = windowMinWidth + node.borderAllSides * 2
-                        end
-                    end
-                    if node.paddingRight or node.paddingLeft then
-                        if node.paddingRight then
-                            windowMinWidth = windowMinWidth + node.paddingRight
-                        end
-                        if node.paddingLeft then
-                            windowMinWidth = windowMinWidth + node.paddingLeft
-                        end
-                    elseif node.paddingAllSides then
-                        windowMinWidth = windowMinWidth + node.paddingAllSides * 2
-                    end
+                    windowMinWidth = AddPaddingWidth(windowMinWidth, node)
+                    windowMinWidth = AddBorderWidth(windowMinWidth, node)
                     node = node.parent
                 end
                 -- not enough width, it seems double outer thick border frame do not contain property.

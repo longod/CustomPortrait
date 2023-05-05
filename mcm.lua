@@ -4,14 +4,8 @@ local modConfig = {}
 local settings = require("longod.CustomPortrait.config")
 local validater = require("longod.CustomPortrait.validater")
 
-local indent = 12
-
----@param bool boolean
----@return string
-local function GetYesNo(bool)
-    ---@diagnostic disable-next-line: return-type-mismatch
-    return bool and tes3.findGMST(tes3.gmst.sYes).value or tes3.findGMST(tes3.gmst.sNo).value
-end
+local indent = 16
+local spacing = 4
 
 ---@param parentBlock tes3uiElement
 ---@return tes3uiElement
@@ -20,8 +14,8 @@ local function CreateOuterContainer(parentBlock)
     outerContainer.flowDirection = tes3.flowDirection.topToBottom
     outerContainer.widthProportional = 1.0
     outerContainer.autoHeight = true
-    outerContainer.borderAllSides = 6
-    outerContainer.borderBottom = 6
+    outerContainer.borderAllSides = spacing
+    outerContainer.borderLeft = indent
     return outerContainer
 end
 
@@ -34,8 +28,8 @@ local function CreateInnerContainer(parentBlock)
     innerContainer.heightProportional = parentBlock.heightProportional
     innerContainer.autoHeight = parentBlock.autoHeight
     innerContainer.flowDirection = tes3.flowDirection.leftToRight
-    innerContainer.paddingAllSides = 6
-    innerContainer.paddingRight = indent
+    -- innerContainer.paddingAllSides = 6
+    innerContainer.paddingLeft = indent
     return innerContainer
 end
 
@@ -47,58 +41,110 @@ local function ContentsChanged(element)
     end
 end
 
+---@param parentBlock tes3uiElement
+---@param text string
+---@param bool boolean
+---@param callback fun(e: tes3uiEventData) : boolean
+---@return tes3uiElement
+---@return tes3uiElement
+---@return tes3uiElement
+---@return tes3uiElement
+local function CreateButton(parentBlock, text, bool, callback)
+
+    ---@param bool boolean
+    ---@return string
+    local function GetYesNo(bool)
+        ---@diagnostic disable-next-line: return-type-mismatch
+        return bool and tes3.findGMST(tes3.gmst.sYes).value or tes3.findGMST(tes3.gmst.sNo).value
+    end
+
+    local outer = CreateOuterContainer(parentBlock)
+    local inner = CreateInnerContainer(outer)
+    local button = inner:createButton({ id = tes3ui.registerID("Button"), text = GetYesNo(bool) })
+    button.borderRight = indent
+    local label = inner:createLabel({ text = text })
+    label.borderTop = 4 -- fit withbutton
+    button:register(tes3.uiEvent.mouseClick,
+    ---@param e tes3uiEventData
+    function(e)
+        local result = callback(e)
+        e.source.text = GetYesNo(result)
+    end)
+    return outer, inner, button, label
+end
+
+---@param parentBlock tes3uiElement
+---@param text string
+---@return tes3uiElement
+---@return tes3uiElement
+local function CreateDescription(parentBlock, text)
+    local right = CreateInnerContainer(parentBlock)
+    right.childAlignX = 1
+    right.widthProportional = 1.0
+    right.autoHeight = true
+    right.paddingLeft = indent * 4
+    local desc = right:createLabel({ text = text })
+    desc.wrapText = true
+    return right, desc
+end
+
 ---@param content tes3uiElement
 ---@param scrollBar tes3uiElement
 ---@param profile PortraitProfile
-local function CreateProfileSettings(content, scrollBar, profile)
+---@param isGlobal boolean
+local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
     local previewFrame = nil ---@type tes3uiElement
     local previewImage = nil ---@type tes3uiElement
-    local function UpdatePreview()
+
+    ---@param updateLayout boolean
+    local function UpdatePreview(updateLayout)
         if not validater.IsValidPath(profile.path) then
-            tes3.messageBox("error path")
+            tes3.messageBox("[Custom Portrait] Invalid Path: " .. profile.path)
             return
         end
         local texture = niSourceTexture.createFromPath(profile.path)
         if not validater.IsValidTextue(texture) then
-            tes3.messageBox("error tex")
+            tes3.messageBox("[Custom Portrait] Invalid Texture: " .. profile.path)
             return
         end
-        
-        -- local border = pane:createThinBorder()
-        -- border.paddingAllSides = 4
-        -- --border.width = config.height * 0.5 + 4*2
-        -- -- border.height = config.height+ 4*2
-        local border = previewFrame
-        border.width = profile.height * 0.5 + 4 * 2 + math.max(profile.width - profile.height * 0.5, 0) * profile.uncropWidth
 
-        -- border.autoWidth = true     -- TODO width is image size base
-        -- border.autoHeight = true
-        --local image = border:createImage({ path = config.path })
-        -- image.autoWidth = true
-        -- image.autoHeight = true
+        local width = profile.width > 0 and profile.width or texture.width
+        local height = profile.height > 0 and profile.height or texture.height
+        
+        local border = previewFrame
+        local padding = 4
+        local aspect = 0.5
+        border.borderLeft = 4 -- fit others
+        border.paddingAllSides = padding
+        border.autoWidth = false 
+        border.autoHeight = false
+        local h = math.clamp(height, 128, 256) -- display limit
+        local scale = (h/height)
+        border.height = h + padding * 2
+        border.width = (math.lerp(h * aspect, width * scale, profile.uncropWidth )) + padding * 2
         local image  = previewImage
         image.contentPath = profile.path
-        image.contentPath = profile.path
-        image.imageScaleX = profile.width / texture.width
-        image.imageScaleY = profile.height / texture.height
-        image:getTopLevelMenu():updateLayout()
-        ContentsChanged(scrollBar)
+        image.imageScaleX = (width  / texture.width) * scale
+        image.imageScaleY = (height / texture.height) * scale
+
+        if updateLayout then
+            image:getTopLevelMenu():updateLayout()
+            ContentsChanged(scrollBar)
+        end
     end
 
-
-
-
-    -- todo validater
     ---@param parentBlock tes3uiElement
     ---@param text string
+    ---@param numeric boolean?
+    ---@param validate fun(text:string): any
     ---@return tes3uiElement
     ---@return tes3uiElement
-    local function createInputField(parentBlock, text, placeholder)
+    local function CreateInputField(parentBlock, text, numeric, validate)
         local border = parentBlock:createThinBorder()
         border.widthProportional = 1.0
         border.autoHeight = true
         border.flowDirection = tes3.flowDirection.leftToRight
-        local inputField = border:createTextInput({ text = text, placeholderText = placeholder })
+        local inputField = border:createTextInput({ text = text:trim(), numeric = numeric })
         inputField.widthProportional = 1.0
         inputField.autoHeight = true
         inputField.widget.lengthLimit = nil
@@ -108,13 +154,18 @@ local function CreateProfileSettings(content, scrollBar, profile)
         inputField.borderTop = 2
         inputField.consumeMouseEvents = false
         inputField.wrapText = true
+        if not validate or validate(inputField.text) ~= nil then
+            inputField.color = tes3ui.getPalette(tes3.palette.normalOverColor)
+        else
+            inputField.color = tes3ui.getPalette(tes3.palette.negativeColor)
+        end
         return border, inputField
     end
 
     ---@param parentBlock tes3uiElement
     ---@return tes3uiElement
     ---@return tes3uiElement
-    local function createInputButton(parentBlock) 
+    local function CreateInputButton(parentBlock) 
         local submit = parentBlock:createButton({ id = tes3ui.registerID("TextField_SubmitButton"),
         text = mwse.mcm.i18n("Submit") })
         submit.borderAllSides = 0
@@ -129,24 +180,25 @@ local function CreateProfileSettings(content, scrollBar, profile)
 
     ---@param e tes3uiElement
     ---@param input tes3uiElement
-    local function registerAcquireTextInput(e, input)
+    local function RegisterAcquireTextInput(e, input)
         e:register(tes3.uiEvent.mouseClick, function()
             tes3ui.acquireTextInput(input)
         end)
         if e.children then
             for _, element in ipairs(e.children) do
-                registerAcquireTextInput(element, input)
+                RegisterAcquireTextInput(element, input)
             end
         end
     end
 
     do
-        local outer = CreateOuterContainer(content)
-        local inner = CreateInnerContainer(outer)
-        local button = inner:createButton({ text = GetYesNo(profile.enable) })
-        button.borderRight = indent
-        local label = inner:createLabel({ text = "Enable" })
-        label.borderTop = 4
+        local _, inner = CreateButton(content, "Enable", profile.enable,
+        function()
+            profile.enable = not profile.enable
+            return profile.enable
+        end)
+        local _, desc = CreateDescription(inner, "placeholder")
+        desc.borderTop = 4
     end
 
     -- text input
@@ -159,30 +211,29 @@ local function CreateProfileSettings(content, scrollBar, profile)
         label.heightProportional = 1.0
         label.borderRight = indent
 
-        local border, inputField = createInputField(inner, profile.path)
+        ---@param text string
+        ---@return boolean
+        local function Validate(text)
+            return validater.IsValidPath(text)
+        end
 
-        local submit, revert = createInputButton(inner)
+        local border, inputField = CreateInputField(inner, profile.path, false, Validate)
+
+        local submit, revert = CreateInputButton(inner)
         border.borderRight = indent
         submit.borderRight = indent
 
-        local right = CreateInnerContainer(outer)
-        right.childAlignX = 1
-        right.paddingLeft = indent * 8
-        local desc = right:createLabel({ text = "here is description, texture path is data files relative, .dds, .tga or .bmp extension and width and height must be power of 2 e.g. 8, 16 ..." })
-        desc.wrapText = true
+        CreateDescription(outer, "placeholder")
 
-
-        -- where is gone calette? | 
-
-        registerAcquireTextInput(border, inputField)
+        RegisterAcquireTextInput(border, inputField)
 
         local function Accept()
             local text = inputField.text:trim()
-            if validater.IsValidPath(text) then
+            if Validate(text) then
                 profile.path = text
-                UpdatePreview()
+                UpdatePreview(true)
             else
-                -- todo error message
+                tes3.messageBox("Invalid Path: " .. profile.path)
             end
         end
 
@@ -197,7 +248,7 @@ local function CreateProfileSettings(content, scrollBar, profile)
             e.source:forwardEvent(e)
 
             local text = inputField.text:trim()
-            if validater.IsValidPath(text) then
+            if Validate(text) then
                 inputField.color = tes3ui.getPalette(tes3.palette.normalOverColor)
             else
                 inputField.color = tes3ui.getPalette(tes3.palette.negativeColor)
@@ -216,7 +267,7 @@ local function CreateProfileSettings(content, scrollBar, profile)
             -- todo better before saved path than submiited path
             inputField.text = profile.path
             local text = inputField.text:trim()
-            if validater.IsValidPath(text) then
+            if Validate(text) then
                 inputField.color = tes3ui.getPalette(tes3.palette.normalOverColor)
             else
                 inputField.color = tes3ui.getPalette(tes3.palette.negativeColor)
@@ -224,35 +275,43 @@ local function CreateProfileSettings(content, scrollBar, profile)
             inputField:getTopLevelMenu():updateLayout()
         end)
 
-        -- todo need copy and paste?
     end
+
     -- width height
     do
-        
-
-
         local outer = CreateOuterContainer(content)
         local inner = CreateInnerContainer(outer)
+
+        ---@param text string
+        ---@return any
+        local function Validate(text)
+            local number = tonumber(text)
+            if number ~= nil and number >= 0 then
+                return number
+            end
+            return nil
+        end
 
         do
             local label = inner:createLabel({ text = "Width"})
             label.autoWidth = true
             label.heightProportional = 1.0
             label.borderRight = indent
-            local border, inputField = createInputField(inner, tostring(profile.width))
-            --border.widthProportional = 0.5
+            local border, inputField = CreateInputField(inner, tostring(profile.width), true, Validate)
             border.borderRight = indent
 
-            registerAcquireTextInput(border, inputField)
+            RegisterAcquireTextInput(border, inputField)
 
             local function Accept()
-            	local number = tonumber(inputField.text:trim())
-                if number ~= nil and number > 0 then
-                    profile.width = number
-                    UpdatePreview()
+            	local number = Validate(inputField.text:trim())
+                if number ~= nil then
+                    profile.width = math.floor(number)
+                    inputField.color = tes3ui.getPalette(tes3.palette.normalOverColor)
+                    UpdatePreview(true)
                 else
-                    -- todo error message
+                    inputField.color = tes3ui.getPalette(tes3.palette.negativeColor)
                 end
+                inputField:getTopLevelMenu():updateLayout()
             end
             inputField:register(tes3.uiEvent.keyEnter,
             ---@param e tes3uiEventData
@@ -271,20 +330,21 @@ local function CreateProfileSettings(content, scrollBar, profile)
             label.autoWidth = true
             label.heightProportional = 1.0
             label.borderRight = indent
-            local border, inputField = createInputField(inner, tostring(profile.height))
-            --border.widthProportional = 0.5
-            border.borderRight = indent
+            local border, inputField = CreateInputField(inner, tostring(profile.height), true, Validate)
+            --border.borderRight = indent
 
-            registerAcquireTextInput(border, inputField)
+            RegisterAcquireTextInput(border, inputField)
 
             local function Accept()
-            	local number = tonumber(inputField.text:trim())
-                if number ~= nil and number > 0 then
-                    profile.height = number
-                    UpdatePreview()
+            	local number = Validate(inputField.text:trim())
+                if number ~= nil then
+                    profile.height = math.floor(number)
+                    inputField.color = tes3ui.getPalette(tes3.palette.normalOverColor)
+                    UpdatePreview(true)
                 else
-                    -- todo error message
+                    inputField.color = tes3ui.getPalette(tes3.palette.negativeColor)
                 end
+                inputField:getTopLevelMenu():updateLayout()
             end
             inputField:register(tes3.uiEvent.keyEnter,
             ---@param e tes3uiEventData
@@ -298,6 +358,13 @@ local function CreateProfileSettings(content, scrollBar, profile)
                 Accept()
             end)
         end
+
+        CreateDescription(outer,
+        "Specifies the size of the original image. "..
+        "This can be used to compensate for changes in aspect ratio caused by a texture to the power of two. "..
+        "When 0, the texture size is treated as a ratio. " ..
+        "The aspect ratio of the rendered character image is 1:2.")
+
     end
 
     -- crop
@@ -316,20 +383,26 @@ local function CreateProfileSettings(content, scrollBar, profile)
         slider.widthProportional = 1.0
         slider.heightProportional = 1.0
         slider.borderRight = indent
+        slider.borderTop = 4
 
-        local label = inner:createLabel({ text = string.format("%.4f", profile.uncropWidth) })
-        label.minWidth = 64
-        label.maxWidth = 128
+        local right = inner:createBlock()
+        right.width = 64
+        right.autoHeight = true
+        right.childAlignX = 1.0
+
+        local label = right:createLabel({ text = string.format("%.3f", profile.uncropWidth) })
         label.autoWidth = true
         label.heightProportional= 1.0
+
+        CreateDescription(outer, "placeholder")
         
         ---@param e tes3uiEventData
         local function OnValueChanged(e)
             local val = (slider.widget.current) / resolution
-            label.text = string.format("%.2f", val)
+            label.text = string.format("%.3f", val)
             val = math.clamp(val, 0.0, 1.0)
             profile.uncropWidth = val
-            UpdatePreview()
+            UpdatePreview(true)
         end
     
         for _, child in ipairs(slider.children) do
@@ -344,12 +417,6 @@ local function CreateProfileSettings(content, scrollBar, profile)
         -- need to update only value test?
         slider:register(tes3.uiEvent.partScrollBarChanged, OnValueChanged)
     end
-    do
-        
-        local outer = CreateOuterContainer(content)
-        local inner = CreateInnerContainer(outer)
-        inner.childAlignX = 1
-    end
 
     do
         local outer = CreateOuterContainer(content)
@@ -358,50 +425,38 @@ local function CreateProfileSettings(content, scrollBar, profile)
         do
             -- test button
             local button = inner:createButton({ id = tes3ui.registerID("TextField_TestButton"),
-                text = "Show/Hide Preview" })
-            button.borderAllSides = 0
-            button.paddingAllSides = 2
+                text = "Hide Preview" })
             button:register(tes3.uiEvent.mouseClick, function(e)
-                UpdatePreview()
+                previewFrame.visible = not previewFrame.visible
+                button.text = previewFrame.visible and "Hide Preview" or "Show Preview"
+                previewFrame:getTopLevelMenu():updateLayout()
+                ContentsChanged(scrollBar)
             end)
         end
+        --[[
         do
             local right = inner:createBlock()
             right.widthProportional = 1.0
             right.autoHeight = true
             right.childAlignX = 1.0
-            local button = right:createButton({ id = tes3ui.registerID("TextField_ResetButton"), text = "Reset Default" })
-            button.borderAllSides = 0
-            button.paddingAllSides = 2
-            --button.heightProportional = 1.0
+            local button = right:createButton({ id = tes3ui.registerID("TextField_ResetButton"), text = "Reset to Default" })
             button:register(tes3.uiEvent.mouseClick,
                 ---@param e tes3uiEventData
                 function(e)
+                    
                 end)
         end
+        ]]--
     end
+    -- preview
     do
         local outer = CreateOuterContainer(content)
         local inner = CreateInnerContainer(outer)
-
-        local texture = niSourceTexture.createFromPath(profile.path)
-
-        -- todo fixed size
-
-        -- todo validation
-        
         local border = inner:createThinBorder()
-        border.paddingAllSides = 4
-        border.width = profile.height * 0.5 + 4 * 2 + math.max(profile.width - profile.height*0.5, 0) * profile.uncropWidth
-        border.autoWidth = false 
-        border.autoHeight = true
         local image = border:createImage()
-        image.contentPath = profile.path
-        image.imageScaleX = profile.width / texture.width
-        image.imageScaleY = profile.height / texture.height
-
         previewFrame = border
         previewImage = image
+        UpdatePreview(false)
     end
 
 end
@@ -417,6 +472,23 @@ function modConfig.onCreate(container)
 
     local config = settings.Load()
 
+    local characterProfileBlock ---@type tes3uiElement
+
+    
+    ---comment
+    ---@param element tes3uiElement
+    ---@param visible boolean
+    local function SetVisibility(element, visible)
+        if element then
+            element.visible = visible
+            if element.children then
+                for _, child in ipairs(element.children) do
+                    SetVisibility(child, visible)
+                end
+            end
+        end
+    end
+    
     do
         local block = CreateOuterContainer(content)
         do
@@ -428,30 +500,23 @@ function modConfig.onCreate(container)
         end
 
         do
-            local outer = CreateOuterContainer(block)
-            local inner = CreateInnerContainer(outer)
-            local button = inner:createButton({ text = GetYesNo(config.enable) })
-            button.borderRight = indent
-            local label = inner:createLabel({ text = "Enable Mod" })
-            label.borderTop = 4
+            CreateButton(block, "Enable Mod", config.enable,
+            function()
+                config.enable = not config.enable
+                return config.enable
+            end)
         end
-
         do
-            local outer = CreateOuterContainer(block)
-            local inner = CreateInnerContainer(outer)
-            local button = inner:createButton({ text = GetYesNo(config.fallbackGlobal) })
-            button.borderRight = indent
-            local label = inner:createLabel({ text = "Use Global Profile" })
-            label.borderTop = 4
-        end
-
-        do
-            local outer = CreateOuterContainer(block)
-            local inner = CreateInnerContainer(outer)
-            local button = inner:createButton({ text = GetYesNo(config.perCharacter) })
-            button.borderRight = indent
-            local label = inner:createLabel({ text = "Use Character Profile" })
-            label.borderTop = 4
+            local _, inner = CreateButton(block, "Use Character Profile", config.useCharacterProfile,
+            function()
+                config.useCharacterProfile = not config.useCharacterProfile
+                SetVisibility(characterProfileBlock, config.useCharacterProfile)
+                container:updateLayout()
+                ContentsChanged(pane)
+                return config.useCharacterProfile
+            end)
+            local _, desc = CreateDescription(inner, "placeholder")
+            desc.borderTop = 4
         end
     end
     
@@ -464,13 +529,14 @@ function modConfig.onCreate(container)
             label.color = headerColor
             inner:createDivider().widthProportional = 1
         end
-        CreateProfileSettings(block, pane, config.global)
+        CreateProfileSettings(block, pane, config.global, true)
     end
 
 
     -- per character profile...
     do
         local block = CreateOuterContainer(content)
+        characterProfileBlock = block
         do
             local inner = CreateInnerContainer(block)
             local label = inner:createLabel({text="Character Profile"})
@@ -481,13 +547,14 @@ function modConfig.onCreate(container)
 
         if tes3.onMainMenu() then
             local inner = CreateInnerContainer(block)
-            inner:createLabel({text = "Per Character Profile at in-game."})
+            inner:createLabel({text = "Character Profile at in-game."})
         else
             local profile = settings:GetCharacterProfile()
             if profile then
-                CreateProfileSettings(block, pane, profile)
+                CreateProfileSettings(block, pane, profile, false)
             end
         end
+        SetVisibility(characterProfileBlock, config.useCharacterProfile)
     end
 
     container:updateLayout()
