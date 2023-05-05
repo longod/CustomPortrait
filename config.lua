@@ -6,7 +6,7 @@ local this = {}
 ---@field path string
 ---@field width integer
 ---@field height integer
----@field uncropWidth number
+---@field cropWidth number
 
 ---@class Config
 this.defaultConfig = {
@@ -18,7 +18,7 @@ this.defaultConfig = {
         path = "MWSE/mods/longod/CustomPortrait/portrait.dds",
         width = 256,
         height = 256,
-        uncropWidth = 0.65,
+        cropWidth = 0.65,
     },
 }
 this.config = nil ---@type Config
@@ -47,14 +47,19 @@ function this.GetCharacterProfile(self)
     return nil
 end
 
-
 ---@return PortraitProfile?
 function this.GetProfile(self)
     local config = self.Load()
     if config.enable then
         -- fixme
         if config.useCharacterProfile and not tes3.onMainMenu() and tes3.player and tes3.player.data then
-            return self:GetCharacterProfile()
+            local profile = self:GetCharacterProfile()
+            if profile then
+                table.copymissing(profile, self.defaultConfig.global)
+                if profile.enable then
+                    return profile
+                end
+            end
         end
         return config.global
     end
