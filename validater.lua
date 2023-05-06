@@ -4,7 +4,7 @@ local this = {}
 ---@param path string
 ---@return boolean
 function this.IsValidPath(path)
-    -- todo check extension but many patterns
+    -- if needed to check extension but many patterns
     if path == nil or path:len() < 4 then -- expects 3 characters extension
         return false
     end

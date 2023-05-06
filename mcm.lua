@@ -9,12 +9,22 @@ local validater = require("longod.CustomPortrait.validater")
 local indent = 16
 local spacing = 4
 
--- TODO id
+local guidOuterContainer = tes3ui.registerID("CP:OuterContainer")
+local guidInnerContainer = tes3ui.registerID("CP:InnerContainer")
+local guidButton = tes3ui.registerID("CP:Button")
+local guidLabel = tes3ui.registerID("CP:Label")
+local guidTextInputLabel = tes3ui.registerID("CP:TextInput")
+local guidSlider = tes3ui.registerID("CP:Slider")
+local guidContainer = tes3ui.registerID("CP:Container")
+local guidBorder = tes3ui.registerID("CP:Border")
+local guidImage = tes3ui.registerID("CP:Image")
+local guidScrollPane = tes3ui.registerID("CP:ScrollPane")
+local guidDivider = tes3ui.registerID("CP:Divider")
 
 ---@param parentBlock tes3uiElement
 ---@return tes3uiElement
 local function CreateOuterContainer(parentBlock)
-    local outerContainer = parentBlock:createBlock({ id = tes3ui.registerID("OuterContainer") })
+    local outerContainer = parentBlock:createBlock({ id = guidOuterContainer })
     outerContainer.flowDirection = tes3.flowDirection.topToBottom
     outerContainer.widthProportional = 1.0
     outerContainer.autoHeight = true
@@ -26,7 +36,7 @@ end
 ---@param parentBlock tes3uiElement
 ---@return tes3uiElement
 local function CreateInnerContainer(parentBlock)
-    local innerContainer = parentBlock:createBlock({ id = tes3ui.registerID("InnerContainer") })
+    local innerContainer = parentBlock:createBlock({ id = guidInnerContainer })
     innerContainer.widthProportional = parentBlock.widthProportional
     innerContainer.autoWidth = parentBlock.autoWidth
     innerContainer.heightProportional = parentBlock.heightProportional
@@ -63,20 +73,20 @@ end
 local function CreateButton(parentBlock, text, bool, callback)
     local outer = CreateOuterContainer(parentBlock)
     local inner = CreateInnerContainer(outer)
-    local button = inner:createButton({ id = tes3ui.registerID("Button"), text = GetYesNo(bool) })
+    local button = inner:createButton({ id = guidButton, text = GetYesNo(bool) })
     button.borderAllSides = 0
     button.borderRight = indent
     button.paddingAllSides = 2
 
-    local label = inner:createLabel({ text = text })
+    local label = inner:createLabel({ id = guidLabel, text = text })
     label.borderTop = 2 -- fit button
 
     button:register(tes3.uiEvent.mouseClick,
-    ---@param e tes3uiEventData
-    function(e)
-        local result = callback(e)
-        e.source.text = GetYesNo(result)
-    end)
+        ---@param e tes3uiEventData
+        function(e)
+            local result = callback(e)
+            e.source.text = GetYesNo(result)
+        end)
     return outer, inner, button, label
 end
 
@@ -87,7 +97,7 @@ end
 local function CreateDescription(parentBlock, text)
     local block = CreateInnerContainer(parentBlock)
     block.paddingLeft = indent * 4
-    local desc = block:createLabel({ text = text })
+    local desc = block:createLabel({ id = guidLabel, text = text })
     desc.wrapText = true
     desc.color = tes3ui.getPalette(tes3.palette.disabledColor)
     return block, desc
@@ -118,25 +128,51 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
             tes3.messageBox("[Custom Portrait] Invalid Image:\n" .. profile.path)
             return
         end
+        -- simulate character image
+        local textureWidth     = math.max(texture.width, 1)
+        local textureHeight    = math.max(texture.height, 1)
+        local desiredWidth     = math.max(profile.width > 0 and profile.width or textureWidth, 1)
+        local desiredHeight    = math.max(profile.height > 0 and profile.height or textureHeight, 1)
+        local desiredAspect    = desiredWidth / desiredHeight
+        local widthRatio       = desiredWidth / textureWidth
+        local heightRatio      = desiredHeight / textureHeight
+        local aspectRatio      = widthRatio / heightRatio
 
-        local width = math.max(profile.width > 0 and profile.width or texture.width, 1)
-        local height = math.max(profile.height > 0 and profile.height or texture.height, 1)
-        
-        local border = previewFrame
-        local padding = 4
-        local aspect = 0.5
+        -- frame settings
+        local border           = previewFrame
+        local padding          = 4
+        local aspect           = 0.5
         border.paddingAllSides = padding
-        border.autoWidth = false 
-        border.autoHeight = false
-        local h = math.clamp(height, 128, 256) -- limit
-        local scale = h / height
-        border.height = h + padding * 2
-        border.width = (math.lerp(h * aspect, width * scale, profile.cropWidth )) + padding * 2
-        local image  = previewImage
-        image.contentPath = profile.path
-        image.imageScaleX = (width  / math.max(texture.width, 1)) * scale
-        image.imageScaleY = (height / math.max(texture.height, 1)) * scale
+        border.autoWidth       = false
+        border.autoHeight      = false
+        local imageHeight      = math.clamp(desiredHeight, 128, 256) -- limit
+        local heightScale      = imageHeight / desiredHeight
+        border.height          = imageHeight + padding * 2
 
+        -- crop
+        local minWidth         = imageHeight * aspect
+        local maxWidth         = math.max(desiredWidth * heightScale, minWidth)
+        border.width           = (math.lerp(minWidth, maxWidth, profile.cropWidth)) + padding * 2
+
+        -- scale
+        local image            = previewImage
+        image.contentPath      = profile.path
+        image.width            = imageHeight * aspect
+        image.height           = imageHeight
+        image.scaleMode        = false
+        image.autoWidth        = true
+        image.autoHeight       = true
+        if aspect > desiredAspect then
+            -- fit width base
+            local scale = image.width / textureWidth
+            image.imageScaleX = scale
+            image.imageScaleY = scale / aspectRatio
+        else
+            -- fit height base
+            local scale = image.height / textureHeight
+            image.imageScaleX = scale * aspectRatio
+            image.imageScaleY = scale
+        end
         if updateLayout then
             image:getTopLevelMenu():updateLayout()
             ContentsChanged(scrollBar)
@@ -154,7 +190,7 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         border.widthProportional = 1.0
         border.autoHeight = true
         border.flowDirection = tes3.flowDirection.leftToRight
-        local inputField = border:createTextInput({ text = text:trim(), numeric = numeric })
+        local inputField = border:createTextInput({ id = guidTextInputLabel, text = text:trim(), numeric = numeric })
         inputField.widthProportional = 1.0
         inputField.autoHeight = true
         inputField.widget.lengthLimit = nil
@@ -175,12 +211,11 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
     ---@param parentBlock tes3uiElement
     ---@return tes3uiElement
     ---@return tes3uiElement
-    local function CreateInputButton(parentBlock) 
-        local submit = parentBlock:createButton({ id = tes3ui.registerID("TextField_SubmitButton"),
-        text = mwse.mcm.i18n("Submit") })
+    local function CreateInputButton(parentBlock)
+        local submit = parentBlock:createButton({ id = guidButton, text = mwse.mcm.i18n("Submit") })
         submit.borderAllSides = 0
         submit.paddingAllSides = 2
-        local revert = parentBlock:createButton({ id = tes3ui.registerID("TextField_RevertButton"), text = "Revert" })
+        local revert = parentBlock:createButton({ id = guidButton, text = "Revert" })
         revert.borderAllSides = 0
         revert.paddingAllSides = 2
         return submit, revert
@@ -201,10 +236,10 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
 
     if not isGlobal then
         local _, inner, button = CreateButton(content, "Enable Portrait", profile.enable,
-        function()
-            profile.enable = not profile.enable
-            return profile.enable
-        end)
+            function()
+                profile.enable = not profile.enable
+                return profile.enable
+            end)
         local _, desc = CreateDescription(inner, "If disabled, the global portrait is used for the current character.")
         desc.borderTop = 2
         enableField = button
@@ -215,7 +250,7 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         local outer = CreateOuterContainer(content)
         local inner = CreateInnerContainer(outer)
 
-        local label = inner:createLabel({ text = "Image Path"})
+        local label = inner:createLabel({ id = guidLabel, text = "Image Path" })
         label.minWidth = 96
         label.autoWidth = true
         label.autoHeight = true
@@ -236,9 +271,9 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         submit.borderRight = indent
 
         CreateDescription(outer,
-        "The path of the portrait image from 'Data Files'. Image format must be DDS, TGA or BMP. " ..
-        "And the image must have power-of-2 dimensions (i.e. 64, 128, 256, 512, 1024). " ..
-        "If the aspect ratio does not match that of the image before resizing, shrink or stretch the image, or add margins. It can be adjusted in the settings described below.")
+            "The path of the portrait image from 'Data Files'. Image format must be DDS, TGA or BMP. " ..
+            "And the image must have power-of-2 dimensions (i.e. 64, 128, 256, 512, 1024). " ..
+            "If the aspect ratio does not match that of the image before resizing, shrink or stretch the image, or add margins. It can be adjusted in the settings described below.")
 
         RegisterAcquireTextInput(border, inputField)
 
@@ -254,43 +289,42 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         end
 
         inputField:register(tes3.uiEvent.keyEnter,
-        ---@param e tes3uiEventData
-        function(e)
-            Accept()
-        end)
+            ---@param e tes3uiEventData
+            function(e)
+                Accept()
+            end)
         inputField:register(tes3.uiEvent.keyPress,
-        ---@param e tes3uiEventData
-        function(e)
-            e.source:forwardEvent(e)
+            ---@param e tes3uiEventData
+            function(e)
+                e.source:forwardEvent(e)
 
-            local text = inputField.text:trim()
-            if Validate(text) then
-                inputField.color = tes3ui.getPalette(tes3.palette.normalOverColor)
-            else
-                inputField.color = tes3ui.getPalette(tes3.palette.negativeColor)
-            end
-            inputField:getTopLevelMenu():updateLayout()
-        end)
+                local text = inputField.text:trim()
+                if Validate(text) then
+                    inputField.color = tes3ui.getPalette(tes3.palette.normalOverColor)
+                else
+                    inputField.color = tes3ui.getPalette(tes3.palette.negativeColor)
+                end
+                inputField:getTopLevelMenu():updateLayout()
+            end)
 
         submit:register(tes3.uiEvent.mouseClick,
-        ---@param e tes3uiEventData
-        function(e)
-            Accept()
-        end)
+            ---@param e tes3uiEventData
+            function(e)
+                Accept()
+            end)
         revert:register(tes3.uiEvent.mouseClick,
-        ---@param e tes3uiEventData
-        function(e)
-            --inputField.text = profile.path
-            inputField.text = backupPath
-            local text = inputField.text:trim()
-            if Validate(text) then
-                inputField.color = tes3ui.getPalette(tes3.palette.normalOverColor)
-            else
-                inputField.color = tes3ui.getPalette(tes3.palette.negativeColor)
-            end
-            UpdatePreview(true)
-        end)
-
+            ---@param e tes3uiEventData
+            function(e)
+                --inputField.text = profile.path
+                inputField.text = backupPath
+                local text = inputField.text:trim()
+                if Validate(text) then
+                    inputField.color = tes3ui.getPalette(tes3.palette.normalOverColor)
+                else
+                    inputField.color = tes3ui.getPalette(tes3.palette.negativeColor)
+                end
+                UpdatePreview(true)
+            end)
     end
 
     -- width height
@@ -309,7 +343,7 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         end
 
         do
-            local label = inner:createLabel({ text = "Width"})
+            local label = inner:createLabel({ id = guidLabel, text = "Width" })
             label.minWidth = 96
             label.autoWidth = true
             label.autoHeight = true
@@ -322,7 +356,7 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
             RegisterAcquireTextInput(border, inputField)
 
             local function Accept()
-            	local number = Validate(inputField.text:trim())
+                local number = Validate(inputField.text:trim())
                 if number ~= nil then
                     profile.width = math.floor(number)
                     inputField.color = tes3ui.getPalette(tes3.palette.normalOverColor)
@@ -333,19 +367,19 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
                 inputField:getTopLevelMenu():updateLayout()
             end
             inputField:register(tes3.uiEvent.keyEnter,
-            ---@param e tes3uiEventData
-            function(e)
-                Accept()
-            end)
+                ---@param e tes3uiEventData
+                function(e)
+                    Accept()
+                end)
             inputField:register(tes3.uiEvent.keyPress,
-            ---@param e tes3uiEventData
-            function(e)
-                e.source:forwardEvent(e)
-                Accept()
-            end)
+                ---@param e tes3uiEventData
+                function(e)
+                    e.source:forwardEvent(e)
+                    Accept()
+                end)
         end
         do
-            local label = inner:createLabel({ text = "Height"})
+            local label = inner:createLabel({ id = guidLabel, text = "Height" })
             label.minWidth = 96
             label.autoWidth = true
             label.autoHeight = true
@@ -357,7 +391,7 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
             RegisterAcquireTextInput(border, inputField)
 
             local function Accept()
-            	local number = Validate(inputField.text:trim())
+                local number = Validate(inputField.text:trim())
                 if number ~= nil then
                     profile.height = math.floor(number)
                     inputField.color = tes3ui.getPalette(tes3.palette.normalOverColor)
@@ -368,24 +402,23 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
                 inputField:getTopLevelMenu():updateLayout()
             end
             inputField:register(tes3.uiEvent.keyEnter,
-            ---@param e tes3uiEventData
-            function(e)
-                Accept()
-            end)
+                ---@param e tes3uiEventData
+                function(e)
+                    Accept()
+                end)
             inputField:register(tes3.uiEvent.keyPress,
-            ---@param e tes3uiEventData
-            function(e)
-                e.source:forwardEvent(e)
-                Accept()
-            end)
+                ---@param e tes3uiEventData
+                function(e)
+                    e.source:forwardEvent(e)
+                    Accept()
+                end)
         end
 
         CreateDescription(outer,
-        "Specifies the size of the original image. "..
-        "This can be used to compensate for changes in aspect ratio caused by a texture to the power of two. "..
-        "When 0, the texture size is treated as a ratio. " ..
-        "The aspect ratio of the rendered character image is 1:2.")
-
+            "Specifies the size of the original image. " ..
+            "This can be used to compensate for changes in aspect ratio caused by a texture to the power of two. " ..
+            "When 0, the texture size is treated as a ratio. " ..
+            "The aspect ratio of the rendered character image is 1:2.")
     end
 
     -- crop
@@ -394,34 +427,35 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         local outer = CreateOuterContainer(content)
         local inner = CreateInnerContainer(outer)
 
-        local label = inner:createLabel({ text = "Crop Width"})
+        local label = inner:createLabel({ id = guidLabel, text = "Crop Width" })
         label.minWidth = 96
         label.autoWidth = true
         label.autoHeight = true
         label.borderRight = indent
         label.borderTop = 2 -- fit button
-        
-        local slider = inner:createSlider({ current = profile.cropWidth * cropResolution, step = 1, jump = 16, max = cropResolution})
+
+        local slider = inner:createSlider({ id = guidSlider, current = profile.cropWidth * cropResolution, step = 1,
+            jump = 16, max = cropResolution })
         slider.widthProportional = 1.0
         slider.heightProportional = 1.0
         slider.borderRight = indent
         slider.borderTop = 4
         cropField = slider
 
-        local right = inner:createBlock()
+        local right = inner:createBlock({ id = guidContainer })
         right.width = 64
         right.autoHeight = true
         right.childAlignX = 1.0
 
-        local label = right:createLabel({ text = string.format("%.3f", profile.cropWidth) })
+        local label = right:createLabel({ id = guidLabel, text = string.format("%.3f", profile.cropWidth) })
         label.autoWidth = true
         label.autoHeight = true
         cropValueField = label
 
         CreateDescription(outer,
-        "The ratio to crop width to the aspect ratio of the rendered character image (1:2). " ..
-        "For wide portraits, not cropping may overfill the inventory.")
-        
+            "The ratio to crop width to the aspect ratio of the rendered character image (1:2). " ..
+            "For wide portraits, not cropping may overfill the inventory.")
+
         ---@param e tes3uiEventData
         local function OnValueChanged(e)
             local val = (slider.widget.current) / cropResolution
@@ -430,16 +464,16 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
             profile.cropWidth = math.clamp(val, 0, 1)
             UpdatePreview(true)
         end
-    
+
         for _, child in ipairs(slider.children) do
-            child:register(tes3.uiElementType.mouseClick, OnValueChanged) -- click, drag
-            child:register(tes3.uiEvent.mouseRelease, OnValueChanged) -- drag
+            child:register(tes3.uiElementType.mouseClick, OnValueChanged)  -- click, drag
+            child:register(tes3.uiEvent.mouseRelease, OnValueChanged)      -- drag
             for _, gchild in ipairs(child.children) do
-                gchild:register(tes3.uiEvent.mouseClick, OnValueChanged) -- click, drag
+                gchild:register(tes3.uiEvent.mouseClick, OnValueChanged)   -- click, drag
                 gchild:register(tes3.uiEvent.mouseRelease, OnValueChanged) -- drag
             end
         end
-    
+
         -- need to update only value test?
         slider:register(tes3.uiEvent.partScrollBarChanged, OnValueChanged)
     end
@@ -450,8 +484,10 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
 
         do
             -- test button
-            local button = inner:createButton({ id = tes3ui.registerID("TextField_TestButton"),
-                text = "Hide Preview" })
+            local button = inner:createButton({
+                id = guidButton,
+                text = "Hide Preview"
+            })
             button.borderAllSides = 0
             button.paddingAllSides = 2
             button:register(tes3.uiEvent.mouseClick, function(e)
@@ -462,11 +498,11 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
             end)
         end
         do
-            local right = inner:createBlock()
+            local right = inner:createBlock({ id = guidContainer })
             right.widthProportional = 1.0
             right.autoHeight = true
             right.childAlignX = 1.0
-            local button = right:createButton({ id = tes3ui.registerID("TextField_ResetButton"), text = "Reset to Default" })
+            local button = right:createButton({ id = guidButton, text = "Reset to Default" })
             button.borderAllSides = 0
             button.paddingAllSides = 2
 
@@ -500,19 +536,19 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
     do
         local outer = CreateOuterContainer(content)
         local inner = CreateInnerContainer(outer)
-        local border = inner:createThinBorder()
-        local image = border:createImage()
+        local border = inner:createThinBorder({ id = guidBorder })
+        border.width = 128
+        border.height = 128
+        local image = border:createImage({ id = guidImage })
         previewFrame = border
         previewImage = image
         UpdatePreview(false)
     end
-
 end
 
 ---@param container tes3uiElement
 function modConfig.onCreate(container)
-
-    local pane = container:createVerticalScrollPane()
+    local pane = container:createVerticalScrollPane({ id = guidScrollPane })
     pane.widthProportional = 1.0
     pane.heightProportional = 1.0
     local content = pane:getContentElement()
@@ -522,7 +558,7 @@ function modConfig.onCreate(container)
 
     local characterProfileBlock ---@type tes3uiElement
 
-    
+
     ---comment
     ---@param element tes3uiElement
     ---@param visible boolean
@@ -536,50 +572,52 @@ function modConfig.onCreate(container)
             end
         end
     end
-    
+
     do
         local block = CreateOuterContainer(content)
         do
             local inner = CreateInnerContainer(block)
-            local label = inner:createLabel({text="Common Settings"})
+            local label = inner:createLabel({ id = guidLabel, text = "Common Settings" })
             label.color = headerColor
-            inner:createDivider().widthProportional = 1
+            inner:createDivider({ id = guidDivider }).widthProportional = 1
         end
 
         do
             CreateButton(block, "Enable Mod", config.enable,
-            function()
-                config.enable = not config.enable
-                return config.enable
-            end)
+                function()
+                    config.enable = not config.enable
+                    return config.enable
+                end)
         end
         do
-            local _, inner = CreateButton(block, "Use Different Portraits For Each Character", config.useCharacterProfile,
-            function()
-                config.useCharacterProfile = not config.useCharacterProfile
-                SetVisibility(characterProfileBlock, config.useCharacterProfile)
-                container:updateLayout()
-                ContentsChanged(pane)
-                return config.useCharacterProfile
-            end)
+            local _, inner = CreateButton(block, "Use Different Portraits For Each Character", config
+                .useCharacterProfile,
+                function()
+                    config.useCharacterProfile = not config.useCharacterProfile
+                    SetVisibility(characterProfileBlock, config.useCharacterProfile)
+                    container:updateLayout()
+                    ContentsChanged(pane)
+                    return config.useCharacterProfile
+                end)
         end
     end
-    
+
     -- per character profile...
     do
         local block = CreateOuterContainer(content)
         characterProfileBlock = block
         do
             local inner = CreateInnerContainer(block)
-            local label = inner:createLabel({text="Character Portrait" })
+            local label = inner:createLabel({ id = guidLabel, text = "Character Portrait" })
             label.color = headerColor
-            inner:createDivider().widthProportional = 1
+            inner:createDivider({ id = guidDivider }).widthProportional = 1
         end
 
         if tes3.onMainMenu() then
             local outer = CreateOuterContainer(block)
             local inner = CreateInnerContainer(outer)
-            inner:createLabel({text = "Enabled In-Game"}).color = tes3ui.getPalette(tes3.palette.disabledColor)
+            inner:createLabel({ id = guidLabel, text = "Enabled In-Game" }).color = tes3ui.getPalette(tes3.palette
+            .disabledColor)
         else
             modConfig.characterProfile = settings:GetCharacterProfile()
             if modConfig.characterProfile then
@@ -594,13 +632,14 @@ function modConfig.onCreate(container)
         local block = CreateOuterContainer(content)
         do
             local inner = CreateInnerContainer(block)
-            local label = inner:createLabel({ text = "Global Portrait" })
+            local label = inner:createLabel({ id = guidLabel, text = "Global Portrait" })
             label.color = headerColor
-            inner:createDivider().widthProportional = 1
+            inner:createDivider({ id = guidDivider }).widthProportional = 1
         end
         CreateProfileSettings(block, pane, config.global, true)
 
-        local inner, _ = CreateDescription(block, "Tips: Click on the armor rating to switch between portrait and the rendered character image.")
+        local inner, _ = CreateDescription(block,
+            "Tips: Click on the armor rating to switch between portrait and the rendered character image.")
         inner.paddingLeft = indent * 2
     end
 
@@ -613,8 +652,11 @@ end
 ---@param container tes3uiElement
 function modConfig.onClose(container)
     mwse.saveConfig(settings.configPath, settings.Load())
+    -- flush
     settings:SetCharacterProfile(modConfig.characterProfile)
     modConfig.characterProfile = nil
+    -- re-init state
+    settings.showPortrait = true
 end
 
 return modConfig

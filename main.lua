@@ -1,7 +1,8 @@
 local settings = require("longod.CustomPortrait.config")
 local validater = require("longod.CustomPortrait.validater")
 
-local showPortrait = true
+--local showPortrait = true
+-- cache
 local textureWidth = 1
 local textureHeight = 1
 
@@ -48,6 +49,8 @@ local function RevertCharacterImage(image)
     image.minWidth = nil
     image.imageScaleX = 0
     image.imageScaleY = 0
+    image.autoWidth = false
+    image.autoHeight = false
     tes3ui.updateInventoryCharacterImage()
 end
 
@@ -55,23 +58,20 @@ end
 ---@param image tes3uiElement
 ---@param sourceAspectRatio number 1:2=0.5
 local function OnPreUpdate(e, image, sourceAspectRatio)
-    if showPortrait then
+    if settings.showPortrait then
         local profile = settings:GetProfile()
         if not profile then
             RevertCharacterImage(image)
-            -- TODO if it disabled then enabled in mcm in-game, show state keep false...a little inconvenient
-            showPortrait = false
+            settings.showPortrait = false
             return
         end
-
-        -- FIXME It seems that changes to character profile while inventory is open do not immediately take effect. global profile is OK.
 
         local path = profile.path
         if image.contentPath ~= path then
             if not validater.IsValidPath(path) then
                 tes3.messageBox("[Custom Portrait] Invalid Path:\n" .. profile.path)
                 RevertCharacterImage(image)
-                showPortrait = false
+                settings.showPortrait = false
                 return
             end
 
@@ -79,7 +79,7 @@ local function OnPreUpdate(e, image, sourceAspectRatio)
             if not validater.IsValidTextue(texture) then
                 tes3.messageBox("[Custom Portrait] Invalid Image:\n" .. profile.path)
                 RevertCharacterImage(image)
-                showPortrait = false
+                settings.showPortrait = false
                 return
             end
 
@@ -108,9 +108,13 @@ local function OnPreUpdate(e, image, sourceAspectRatio)
             image.imageScaleY = scale
         end
         image.scaleMode = false
+        -- it seems required, especially go back from mcm while inventory is open. but it's not perfect.
+        image.autoWidth = true
+        image.autoHeight = true
         -- crop
-        image.minWidth = math.ceil(math.lerp(image.height * sourceAspectRatio, (image.height * desiredAspect),
-            profile.cropWidth))
+        local minWidth = image.height * sourceAspectRatio
+        local maxWidth = math.max(minWidth, image.height * desiredAspect)
+        image.minWidth = math.ceil(math.lerp(minWidth, maxWidth, profile.cropWidth))
     end
 end
 
@@ -118,8 +122,7 @@ end
 local function OnUiActivated(e)
     local image = e.element:findChild("MenuInventory_CharacterImage")
     if image then
-
-        showPortrait = true -- initial state
+        settings.showPortrait = true -- initial state
 
         -- aspect ratio of original character image , it's 1:2
         -- fixed value avoid too small values
@@ -137,7 +140,7 @@ local function OnUiActivated(e)
             ---@param ev tes3uiEventData
             function(ev)
                 ev.source:forwardEvent(ev) -- it seems ok
-                if showPortrait then
+                if settings.showPortrait then
                     local windowMinWidth = math.max(image.minWidth, image.width)
                     local node = image
                     -- exclude padding
@@ -159,8 +162,8 @@ local function OnUiActivated(e)
         local ar = e.element:findChild("MenuInventory_ArmorRating")
         ar:register(tes3.uiEvent.mouseClick,
             function()
-                showPortrait = not showPortrait
-                if showPortrait then
+                settings.showPortrait = not settings.showPortrait
+                if settings.showPortrait then
                     -- preUpdate
                 else
                     RevertCharacterImage(image)

@@ -18,11 +18,12 @@ this.defaultConfig = {
         path = "MWSE/mods/longod/CustomPortrait/portrait.dds",
         width = 256,
         height = 256,
-        cropWidth = 0.65,
+        cropWidth = 0.6,
     },
 }
 this.config = nil ---@type Config
 this.configPath = "longod.CustomPortrait"
+this.showPortrait = true -- toggle portrait
 
 ---@return Config
 function this.Load()
