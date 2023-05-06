@@ -39,3 +39,5 @@ This mod allows you to replace the character image in the inventory with your fa
   - Currently it is based on the top left corner, but it might be useful to be able to adjust it. However, the processing of the original character image is affected.
 - If you make changes in the config while the inventory is open, they may not be reflected correctly. If this is the case, it will return to normal after some updates are made.
 - It is possible to mouse over the portrait to view tooltips for equipment and to unequip by clicking, but the appearance will not match. Obviously.
+
+[GitHub](https://github.com/longod/CustomPortrait)
