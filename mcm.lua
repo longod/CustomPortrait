@@ -1,5 +1,7 @@
 ---@class ModConfig
-local modConfig = {}
+local modConfig = {
+    characterProfile = nil, ---@type PortraitProfile?
+}
 
 local settings = require("longod.CustomPortrait.config")
 local validater = require("longod.CustomPortrait.validater")
@@ -43,6 +45,13 @@ local function ContentsChanged(element)
     end
 end
 
+---@param bool boolean
+---@return string
+local function GetYesNo(bool)
+    ---@diagnostic disable-next-line: return-type-mismatch
+    return bool and tes3.findGMST(tes3.gmst.sYes).value or tes3.findGMST(tes3.gmst.sNo).value
+end
+
 ---@param parentBlock tes3uiElement
 ---@param text string
 ---@param bool boolean
@@ -52,22 +61,15 @@ end
 ---@return tes3uiElement
 ---@return tes3uiElement
 local function CreateButton(parentBlock, text, bool, callback)
-
-    ---@param bool boolean
-    ---@return string
-    local function GetYesNo(bool)
-        ---@diagnostic disable-next-line: return-type-mismatch
-        return bool and tes3.findGMST(tes3.gmst.sYes).value or tes3.findGMST(tes3.gmst.sNo).value
-    end
-
     local outer = CreateOuterContainer(parentBlock)
     local inner = CreateInnerContainer(outer)
     local button = inner:createButton({ id = tes3ui.registerID("Button"), text = GetYesNo(bool) })
+    button.borderAllSides = 0
     button.borderRight = indent
     button.paddingAllSides = 2
 
     local label = inner:createLabel({ text = text })
-    label.borderTop = 6 -- fit button
+    label.borderTop = 2 -- fit button
 
     button:register(tes3.uiEvent.mouseClick,
     ---@param e tes3uiEventData
@@ -96,18 +98,24 @@ end
 ---@param profile PortraitProfile
 ---@param isGlobal boolean
 local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
+    local enableField = nil ---@type tes3uiElement
+    local pathField = nil ---@type tes3uiElement
+    local widthField = nil ---@type tes3uiElement
+    local heightField = nil ---@type tes3uiElement
+    local cropField = nil ---@type tes3uiElement
+    local cropValueField = nil ---@type tes3uiElement
     local previewFrame = nil ---@type tes3uiElement
     local previewImage = nil ---@type tes3uiElement
 
     ---@param updateLayout boolean
     local function UpdatePreview(updateLayout)
         if not validater.IsValidPath(profile.path) then
-            tes3.messageBox("[Custom Portrait] Invalid Path: " .. profile.path)
+            tes3.messageBox("[Custom Portrait] Invalid Path:\n" .. profile.path)
             return
         end
         local texture = niSourceTexture.createFromPath(profile.path)
         if not validater.IsValidTextue(texture) then
-            tes3.messageBox("[Custom Portrait] Invalid Image: " .. profile.path)
+            tes3.messageBox("[Custom Portrait] Invalid Image:\n" .. profile.path)
             return
         end
 
@@ -117,7 +125,6 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         local border = previewFrame
         local padding = 4
         local aspect = 0.5
-        border.borderLeft = 4 -- fit others
         border.paddingAllSides = padding
         border.autoWidth = false 
         border.autoHeight = false
@@ -171,8 +178,10 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
     local function CreateInputButton(parentBlock) 
         local submit = parentBlock:createButton({ id = tes3ui.registerID("TextField_SubmitButton"),
         text = mwse.mcm.i18n("Submit") })
+        submit.borderAllSides = 0
         submit.paddingAllSides = 2
         local revert = parentBlock:createButton({ id = tes3ui.registerID("TextField_RevertButton"), text = "Revert" })
+        revert.borderAllSides = 0
         revert.paddingAllSides = 2
         return submit, revert
     end
@@ -191,13 +200,14 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
     end
 
     if not isGlobal then
-        local _, inner = CreateButton(content, "Enable Portrait", profile.enable,
+        local _, inner, button = CreateButton(content, "Enable Portrait", profile.enable,
         function()
             profile.enable = not profile.enable
             return profile.enable
         end)
         local _, desc = CreateDescription(inner, "If disabled, the global portrait is used for the current character.")
-        desc.borderTop = 4
+        desc.borderTop = 2
+        enableField = button
     end
 
     -- text input
@@ -210,7 +220,7 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         label.autoWidth = true
         label.autoHeight = true
         label.borderRight = indent
-        label.borderTop = 6
+        label.borderTop = 2
 
         ---@param text string
         ---@return boolean
@@ -219,8 +229,8 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         end
 
         local border, inputField = CreateInputField(inner, profile.path, false, Validate)
-        border.borderTop = 6
         border.borderRight = indent
+        pathField = inputField
 
         local submit, revert = CreateInputButton(inner)
         submit.borderRight = indent
@@ -232,13 +242,14 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
 
         RegisterAcquireTextInput(border, inputField)
 
+        local backupPath = profile.path -- when opened mcm
         local function Accept()
             local text = inputField.text:trim()
             if Validate(text) then
                 profile.path = text
                 UpdatePreview(true)
             else
-                tes3.messageBox("Invalid Path: " .. profile.path)
+                tes3.messageBox("[Custom Portrait] Invalid Path:\n" .. profile.path)
             end
         end
 
@@ -269,15 +280,15 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         revert:register(tes3.uiEvent.mouseClick,
         ---@param e tes3uiEventData
         function(e)
-            -- todo better before saved path than submiited path
-            inputField.text = profile.path
+            --inputField.text = profile.path
+            inputField.text = backupPath
             local text = inputField.text:trim()
             if Validate(text) then
                 inputField.color = tes3ui.getPalette(tes3.palette.normalOverColor)
             else
                 inputField.color = tes3ui.getPalette(tes3.palette.negativeColor)
             end
-            inputField:getTopLevelMenu():updateLayout()
+            UpdatePreview(true)
         end)
 
     end
@@ -306,6 +317,7 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
             label.borderTop = 2
             local border, inputField = CreateInputField(inner, tostring(profile.width), true, Validate)
             border.borderRight = indent
+            widthField = inputField
 
             RegisterAcquireTextInput(border, inputField)
 
@@ -340,7 +352,7 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
             label.borderRight = indent
             label.borderTop = 2
             local border, inputField = CreateInputField(inner, tostring(profile.height), true, Validate)
-            --border.borderRight = indent
+            heightField = inputField
 
             RegisterAcquireTextInput(border, inputField)
 
@@ -377,6 +389,7 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
     end
 
     -- crop
+    local cropResolution = 1024
     do
         local outer = CreateOuterContainer(content)
         local inner = CreateInnerContainer(outer)
@@ -387,14 +400,13 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         label.autoHeight = true
         label.borderRight = indent
         label.borderTop = 2 -- fit button
-
-        local resolution = 1024
         
-        local slider = inner:createSlider({ current = profile.cropWidth * resolution, step = 1, jump = 16, max = resolution})
+        local slider = inner:createSlider({ current = profile.cropWidth * cropResolution, step = 1, jump = 16, max = cropResolution})
         slider.widthProportional = 1.0
         slider.heightProportional = 1.0
         slider.borderRight = indent
         slider.borderTop = 4
+        cropField = slider
 
         local right = inner:createBlock()
         right.width = 64
@@ -404,6 +416,7 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         local label = right:createLabel({ text = string.format("%.3f", profile.cropWidth) })
         label.autoWidth = true
         label.autoHeight = true
+        cropValueField = label
 
         CreateDescription(outer,
         "The ratio to crop width to the aspect ratio of the rendered character image (1:2). " ..
@@ -411,10 +424,10 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         
         ---@param e tes3uiEventData
         local function OnValueChanged(e)
-            local val = (slider.widget.current) / resolution
+            local val = (slider.widget.current) / cropResolution
             label.text = string.format("%.3f", val)
             val = math.clamp(val, 0.0, 1.0)
-            profile.cropWidth = val
+            profile.cropWidth = math.clamp(val, 0, 1)
             UpdatePreview(true)
         end
     
@@ -439,6 +452,7 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
             -- test button
             local button = inner:createButton({ id = tes3ui.registerID("TextField_TestButton"),
                 text = "Hide Preview" })
+            button.borderAllSides = 0
             button.paddingAllSides = 2
             button:register(tes3.uiEvent.mouseClick, function(e)
                 previewFrame.visible = not previewFrame.visible
@@ -447,18 +461,38 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
                 ContentsChanged(scrollBar)
             end)
         end
-        -- todo
         do
             local right = inner:createBlock()
             right.widthProportional = 1.0
             right.autoHeight = true
             right.childAlignX = 1.0
             local button = right:createButton({ id = tes3ui.registerID("TextField_ResetButton"), text = "Reset to Default" })
+            button.borderAllSides = 0
             button.paddingAllSides = 2
+
+            ---@param input tes3uiElement
+            ---@param value string|number
+            local function SetInputValue(input, value)
+                if input then
+                    input.text = tostring(value)
+                    input.color = tes3ui.getPalette(tes3.palette.normalOverColor) -- expects always valid
+                end
+            end
+
             button:register(tes3.uiEvent.mouseClick,
                 ---@param e tes3uiEventData
                 function(e)
-                    
+                    table.copy(settings.Default().global, profile)
+                    -- feedback values
+                    if enableField then
+                        enableField.text = GetYesNo(profile.enable)
+                    end
+                    SetInputValue(pathField, profile.path)
+                    SetInputValue(widthField, profile.width)
+                    SetInputValue(heightField, profile.height)
+                    cropField.widget.current = profile.cropWidth * cropResolution
+                    cropValueField.text = string.format("%.3f", profile.cropWidth)
+                    UpdatePreview(true)
                 end)
         end
     end
@@ -547,9 +581,9 @@ function modConfig.onCreate(container)
             local inner = CreateInnerContainer(outer)
             inner:createLabel({text = "Enabled In-Game"}).color = tes3ui.getPalette(tes3.palette.disabledColor)
         else
-            local profile = settings:GetCharacterProfile()
-            if profile then
-                CreateProfileSettings(block, pane, profile, false)
+            modConfig.characterProfile = settings:GetCharacterProfile()
+            if modConfig.characterProfile then
+                CreateProfileSettings(block, pane, modConfig.characterProfile, false)
             end
         end
         SetVisibility(characterProfileBlock, config.useCharacterProfile)
@@ -579,8 +613,8 @@ end
 ---@param container tes3uiElement
 function modConfig.onClose(container)
     mwse.saveConfig(settings.configPath, settings.Load())
-    if not tes3.onMainMenu() then
-    end
+    settings:SetCharacterProfile(modConfig.characterProfile)
+    modConfig.characterProfile = nil
 end
 
 return modConfig

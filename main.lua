@@ -64,11 +64,12 @@ local function OnPreUpdate(e, image, sourceAspectRatio)
             return
         end
 
-        local path = profile.path
+        -- FIXME It seems that changes to character profile while inventory is open do not immediately take effect. global profile is OK.
 
+        local path = profile.path
         if image.contentPath ~= path then
             if not validater.IsValidPath(path) then
-                tes3.messageBox("[Custom Portrait] Invalid Path: " .. profile.path)
+                tes3.messageBox("[Custom Portrait] Invalid Path:\n" .. profile.path)
                 RevertCharacterImage(image)
                 showPortrait = false
                 return
@@ -76,7 +77,7 @@ local function OnPreUpdate(e, image, sourceAspectRatio)
 
             local texture = niSourceTexture.createFromPath(path)
             if not validater.IsValidTextue(texture) then
-                tes3.messageBox("[Custom Portrait] Invalid Image: " .. profile.path)
+                tes3.messageBox("[Custom Portrait] Invalid Image:\n" .. profile.path)
                 RevertCharacterImage(image)
                 showPortrait = false
                 return

@@ -35,27 +35,48 @@ function this.Default()
     return table.deepcopy(this.defaultConfig)
 end
 
+---@param self Settings
 ---@return PortraitProfile?
 function this.GetCharacterProfile(self)
     if not tes3.onMainMenu() and tes3.player and tes3.player.data then
         if tes3.player.data.customPortrait == nil then
-            -- todo no allocate in this time
-            tes3.player.data.customPortrait = table.deepcopy(self.Load().global)
+            -- not yet allocated
+            -- mwse.log("player.data.customPortrait not found")
+            return table.deepcopy(self.Load().global)
         end
         return tes3.player.data.customPortrait
     end
     return nil
 end
 
+---@param self Settings
+---@param characterProfile PortraitProfile?
+function this.SetCharacterProfile(self, characterProfile)
+    local config = self.Load()
+    if config.enable and config.useCharacterProfile then
+        if not tes3.onMainMenu() and tes3.player and tes3.player.data then
+            if tes3.player.data.customPortrait == nil then
+                --mwse.log("set to player.data.customPortrait")
+                tes3.player.data.customPortrait = characterProfile
+                return tes3.player.data.customPortrait
+            end
+        end
+    end
+    return nil
+end
+
+---@param self Settings
 ---@return PortraitProfile?
 function this.GetProfile(self)
     local config = self.Load()
     if config.enable then
-        -- fixme
         if config.useCharacterProfile and not tes3.onMainMenu() and tes3.player and tes3.player.data then
-            local profile = self:GetCharacterProfile()
+            local profile = tes3.player.data.customPortrait
+            if profile == nil then
+                profile = self:SetCharacterProfile(self:GetCharacterProfile())
+            end
             if profile then
-                table.copymissing(profile, self.defaultConfig.global)
+                -- table.copymissing(profile, self.defaultConfig.global) -- if table layout changed
                 if profile.enable then
                     return profile
                 end
