@@ -1,5 +1,5 @@
 local settings = require("longod.CustomPortrait.config")
-local validater = require("longod.CustomPortrait.validater")
+local validator = require("longod.CustomPortrait.validator")
 
 --local showPortrait = true
 -- cache
@@ -68,7 +68,7 @@ local function OnPreUpdate(e, image, sourceAspectRatio)
 
         local path = profile.path
         if image.contentPath ~= path then
-            if not validater.IsValidPath(path) then
+            if not validator.IsValidPath(path) then
                 tes3.messageBox("[Custom Portrait] Invalid Path:\n" .. profile.path)
                 RevertCharacterImage(image)
                 settings.showPortrait = false
@@ -76,7 +76,7 @@ local function OnPreUpdate(e, image, sourceAspectRatio)
             end
 
             local texture = niSourceTexture.createFromPath(path)
-            if not validater.IsValidTextue(texture) then
+            if not validator.IsValidTextue(texture) then
                 tes3.messageBox("[Custom Portrait] Invalid Image:\n" .. profile.path)
                 RevertCharacterImage(image)
                 settings.showPortrait = false

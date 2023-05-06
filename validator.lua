@@ -1,4 +1,4 @@
----@class Validater
+---@class validator
 local this = {}
 
 ---@param path string

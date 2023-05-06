@@ -4,7 +4,7 @@ local modConfig = {
 }
 
 local settings = require("longod.CustomPortrait.config")
-local validater = require("longod.CustomPortrait.validater")
+local validator = require("longod.CustomPortrait.validator")
 
 local indent = 16
 local spacing = 4
@@ -119,12 +119,12 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
 
     ---@param updateLayout boolean
     local function UpdatePreview(updateLayout)
-        if not validater.IsValidPath(profile.path) then
+        if not validator.IsValidPath(profile.path) then
             tes3.messageBox("[Custom Portrait] Invalid Path:\n" .. profile.path)
             return
         end
         local texture = niSourceTexture.createFromPath(profile.path)
-        if not validater.IsValidTextue(texture) then
+        if not validator.IsValidTextue(texture) then
             tes3.messageBox("[Custom Portrait] Invalid Image:\n" .. profile.path)
             return
         end
@@ -263,7 +263,7 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         ---@param text string
         ---@return boolean
         local function Validate(text)
-            return validater.IsValidPath(text)
+            return validator.IsValidPath(text)
         end
 
         local border, inputField = CreateInputField(inner, profile.path, false, Validate)
