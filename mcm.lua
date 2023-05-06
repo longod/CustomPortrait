@@ -234,15 +234,18 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         end
     end
 
-    if not isGlobal then
-        local _, inner, button = CreateButton(content, "Enable Portrait", profile.enable,
-            function()
-                profile.enable = not profile.enable
-                return profile.enable
-            end)
+    local _, inner, button = CreateButton(content, "Enable Portrait", profile.enable,
+        function()
+            profile.enable = not profile.enable
+            return profile.enable
+        end)
+    enableField = button
+    if isGlobal then
+        local _, desc = CreateDescription(inner, "If disabled, the portrait will not be used unless it is individually enabled on a character. In other words, only certain characters can use portraits.")
+        desc.borderTop = 2
+    else
         local _, desc = CreateDescription(inner, "If disabled, the global portrait is used for the current character.")
         desc.borderTop = 2
-        enableField = button
     end
 
     -- text input

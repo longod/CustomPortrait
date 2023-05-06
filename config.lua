@@ -83,7 +83,9 @@ function this.GetProfile(self)
                 end
             end
         end
-        return config.global
+        if config.global and config.global.enable then
+            return config.global
+        end
     end
     return nil
 end
