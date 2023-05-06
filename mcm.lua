@@ -271,7 +271,7 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         submit.borderRight = indent
 
         CreateDescription(outer,
-            "The path of the portrait image from 'Data Files'. Image format must be DDS, TGA or BMP. " ..
+            "The path of the portrait image from 'Data Files'. Image file format must be DDS, TGA or BMP. " ..
             "And the image must have power-of-2 dimensions (i.e. 64, 128, 256, 512, 1024). " ..
             "If the aspect ratio does not match that of the image before resizing, shrink or stretch the image, or add margins. It can be adjusted in the settings described below.")
 
@@ -415,10 +415,10 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         end
 
         CreateDescription(outer,
-            "Specifies the size of the original image. " ..
-            "This can be used to compensate for changes in aspect ratio caused by a texture to the power of two. " ..
-            "When 0, the texture size is treated as a ratio. " ..
-            "The aspect ratio of the rendered character image is 1:2.")
+            "Specifies the size of the original image for aspect ratio. " ..
+            "This can adjust for the change in aspect ratio that occurs when it was changed to power-of-2 dimensions. " ..
+            "When 0, dimensions are treated as the aspect ratio as is. " ..
+            "The aspect ratio of the original character image is 1:2.")
     end
 
     -- crop
@@ -453,8 +453,8 @@ local function CreateProfileSettings(content, scrollBar, profile, isGlobal)
         cropValueField = label
 
         CreateDescription(outer,
-            "The ratio to crop width to the aspect ratio of the rendered character image (1:2). " ..
-            "For wide portraits, not cropping may overfill the inventory.")
+            "The ratio of the portrait width to be cropped. " ..
+            "If the image is too wide, the usability of the inventory will be impaired.")
 
         ---@param e tes3uiEventData
         local function OnValueChanged(e)
@@ -639,7 +639,7 @@ function modConfig.onCreate(container)
         CreateProfileSettings(block, pane, config.global, true)
 
         local inner, _ = CreateDescription(block,
-            "Tips: Click on the armor rating to switch between portrait and the rendered character image.")
+            "Tips: Click on the armor rating at the bottom of the portrait to toggle to the rendered character image.")
         inner.paddingLeft = indent * 2
     end
 

@@ -16,9 +16,9 @@ this.defaultConfig = {
     global = {
         enable = true,
         path = "MWSE/mods/longod/CustomPortrait/portrait.dds",
-        width = 256,
-        height = 256,
-        cropWidth = 0.6,
+        width = 512,
+        height = 512,
+        cropWidth = 0.5,
     },
 }
 this.config = nil ---@type Config
