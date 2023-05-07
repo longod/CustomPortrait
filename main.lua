@@ -54,6 +54,23 @@ local function RevertCharacterImage(image)
     tes3ui.updateInventoryCharacterImage()
 end
 
+---@param ev tes3uiEventData
+local function OnMouseClick(ev)
+    -- mwse.log("mouseClick")
+    -- When the cursor is holding an item, it is time to equip or use that item, so do it.
+    -- Otherwise, it wants to unequip the item, so it ignores it.
+    local cursor = tes3ui.findHelpLayerMenu("CursorIcon")
+    if cursor then
+        local tile = cursor:getPropertyObject("MenuInventory_Thing", "tes3inventoryTile")
+        if tile then
+            ev.source:forwardEvent(ev)
+        end
+    end
+    -- mwse.log("unregister on mouseClick")
+    -- When clicked, leave event is not fired.
+    ev.source:unregister(tes3.uiEvent.mouseClick)
+end
+
 ---@param e tes3uiEventData
 ---@param image tes3uiElement
 ---@param sourceAspectRatio number 1:2=0.5
@@ -124,6 +141,33 @@ local function OnUiActivated(e)
     if image then
         settings.showPortrait = true -- initial state
 
+        -- Handle mouse over and click event
+        -- Most cases seem to be fine, but sometimes it's not right when going to and from mod config.
+        image:register(tes3.uiEvent.mouseOver,
+            ---@param ev tes3uiEventData
+            function(ev)
+                -- mwse.log("mouseOver")
+                if settings.showPortrait then
+                    -- mouseClick event seems to be unregistered by the character image process or someone else.
+                    -- so register each time.
+                    -- mwse.log("register on mouseOver")
+                    ev.source:register(tes3.uiEvent.mouseClick, OnMouseClick)
+                    -- And, suppress tooltips by not handling mouseOver event
+                else
+                    ev.source:forwardEvent(ev)
+                end
+            end)
+        image:register(tes3.uiEvent.mouseLeave,
+            ---@param ev tes3uiEventData
+            function(ev)
+                -- mwse.log("mouseLeave")
+                ev.source:forwardEvent(ev)
+                if settings.showPortrait then
+                    -- mwse.log("unregister on mouseLeave")
+                    ev.source:unregister(tes3.uiEvent.mouseClick)
+                end
+            end)
+
         -- aspect ratio of original character image , it's 1:2
         -- fixed value avoid too small values
         local expectAspect = 0.5 -- image.width / image.height
@@ -132,6 +176,7 @@ local function OnUiActivated(e)
         e.element:register(tes3.uiEvent.preUpdate,
             ---@param ev tes3uiEventData
             function(ev)
+                ev.source:forwardEvent(ev) -- nothing seems to happens, but call for compatibility
                 OnPreUpdate(ev, image, expectAspect)
             end)
 
