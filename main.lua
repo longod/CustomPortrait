@@ -82,6 +82,7 @@ local function OnPreUpdate(e, image, sourceAspectRatio)
             settings.showPortrait = false
             return
         end
+        -- mwse.log("OnPreUpdate")
 
         local path = profile.path
         if image.contentPath ~= path then
@@ -136,9 +137,15 @@ local function OnPreUpdate(e, image, sourceAspectRatio)
 end
 
 --- @param e uiActivatedEventData
-local function OnUiActivated(e)
+local function OnMenuInventoryActivated(e)
+    if not e.newlyCreated then
+		return
+	end
+
     local image = e.element:findChild("MenuInventory_CharacterImage")
     if image then
+        -- mwse.log("Activated")
+
         settings.showPortrait = true -- initial state
 
         -- Handle mouse over and click event
@@ -172,12 +179,17 @@ local function OnUiActivated(e)
         -- fixed value avoid too small values
         local expectAspect = 0.5 -- image.width / image.height
 
+        local imageWidth = image.width
+        local imageHeight = image.height
+
         -- The character image is always resized, so resize them again before updating the inventry menu.
         e.element:register(tes3.uiEvent.preUpdate,
             ---@param ev tes3uiEventData
             function(ev)
                 ev.source:forwardEvent(ev) -- nothing seems to happens, but call for compatibility
                 OnPreUpdate(ev, image, expectAspect)
+                imageWidth = image.width
+                imageHeight = image.height
             end)
 
         -- Then, minWwidth of the menu is set by width (before replaced) of the character image and the weight bar, so recalculate minWidth.
@@ -186,6 +198,7 @@ local function OnUiActivated(e)
             function(ev)
                 ev.source:forwardEvent(ev) -- it seems ok
                 if settings.showPortrait then
+                    -- mwse.log("Update")
                     local windowMinWidth = math.max(image.minWidth, image.width)
                     local node = image
                     -- exclude padding
@@ -200,6 +213,17 @@ local function OnUiActivated(e)
                     -- not enough width, it seems double outer thick border frame do not contain property.
                     windowMinWidth = windowMinWidth + (4 * 2) * 2
                     image:getTopLevelMenu().minWidth = windowMinWidth
+
+                    -- If image size is different from the size at the time of PreUpdate, it will attempt to update the image until it is the same size.
+                    -- This avoids changing parameters during Update, but it perhaps not be necessary to adjust the scale in PreUpdate because it perhapsbe OK to do so.
+                    if image.width ~= imageWidth or image.height ~= imageHeight then
+                        -- mwse.log("Reflesh")
+                        timer.delayOneFrame(
+                        function()
+                            e.element:updateLayout()
+                        end,
+                        timer.real)
+                    end
                 end
             end)
 
@@ -219,10 +243,10 @@ local function OnUiActivated(e)
         e.element:updateLayout()
     end
 end
+event.register(tes3.event.uiActivated, OnMenuInventoryActivated, { filter = "MenuInventory" })
 
 local function OnModConfigReady()
     mwse.registerModConfig("Custom Portrait", require("longod.CustomPortrait.mcm"));
 end
 
-event.register(tes3.event.uiActivated, OnUiActivated, { filter = "MenuInventory" })
 event.register(tes3.event.modConfigReady, OnModConfigReady)
